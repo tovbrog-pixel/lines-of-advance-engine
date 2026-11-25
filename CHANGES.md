@@ -2,6 +2,15 @@
 
 Tov Binyamin Brog
 
+## 25 November 2026: coherence fixes from Tov's Sarn Corridor game
+
+Found with the coherence checker (sarn-corridor `tools/coherence.js`) on Tov's 22 Jun save, 200 hours.
+- **Halts at the bound end:** a division halted to wait for a lagging neighbour goes on once that neighbour has gained under 2 km in 6 hours (`DOCTRINE.alignMaxH`, `alignGainKm`), and the corps reports it. The 8th Infantry Division had waited 156 hours; the longest halt is now 17 hours.
+- **Rear battalions close up during a halt:** a battalion over 3 km from its division's centre and heading nearer keeps moving while the division halts.
+- **Retreated battalions rally:** a battalion that fell back over 6 km from its division and is clear of the enemy makes for a point 2 km behind the division's centre. Cut-off battalions fell from 364 to 86 per 100 hours.
+- **Refused orders stand:** when a commander refuses because the division is disorganised or out of ammunition or fuel, the order stands and he tries again each hour. Divisions standing refused fell from 581 to 50 division-hours per 100 hours.
+- **Effect on France 1944:** every regression scenario changes. Exercise Cumberland on five seeds: Blue wins all five (60-20, 50-30, 80-0, 50-30, 70-10), Carthage at hour 7.5 to 9. Command tests pass. Overlord, 168 hours, seeds 7 and 8: same objectives on seed 7, Caen taken on seed 8, losses within 4.
+
 ## 25 November 2026: square axis for corps orders in both games
 
 - **Corps orders:** a corps now takes its axis of advance square to the objective line, as armies already did. On Tov's 22 Jun Sarn Corridor replay, divisions turned back 2 times in 200 hours, against 14 with the old axis from the corps centre to the objective.
