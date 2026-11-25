@@ -60,7 +60,6 @@ git subtree push --prefix engine/src https://github.com/tovbrog-pixel/lines-of-a
 
 | Setting | Effect | Used by |
 | --- | --- | --- |
-| `squareAxis: 'all'` | Corps orders get an axis square to the objective line (army orders always do) | Sarn Corridor |
 | `hHour` | Before this hour neither side fires, flies missions or enters enemy ground | Sarn Corridor |
 | `variants` | One deployment drawn from the seed at the start | Sarn Corridor |
 | `supplyMin` | Minutes between supply ticks (default 10) | Sarn Corridor load tests |
