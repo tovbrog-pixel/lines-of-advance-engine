@@ -2,6 +2,12 @@
 
 Tov Binyamin Brog
 
+## 25 November 2026: concentration (scenario setting `concentrate`)
+
+- **Corps and army orders:** with `sc.concentrate`, a line much wider than the attack needs (over 1.5 times) is attacked at its decisive point: the most valuable enemy-held objective within 6 km of the line, else straight ahead of the commander. Two children go in abreast (three when there are five or more), each on about the frontage its battalions need. A corps sends the others after them in second echelon; an army leaves its other corps to hold and screen their present sectors. The order note names who attacks and toward what.
+- **Computer armies:** with `sc.concentrate`, an army attacks with its three best-placed corps at a time.
+- **Off by default:** France 1944 is unchanged; Sarn Corridor turns it on.
+
 ## 25 November 2026: coherence fixes from Tov's Sarn Corridor game
 
 Found with the coherence checker (sarn-corridor `tools/coherence.js`) on Tov's 22 Jun save, 200 hours.
