@@ -177,6 +177,9 @@ function attachCommand(S) {
     const o = Object.assign({}, opt, reserve ? { then: 'reserve' } : {}, then ? { then } : {}, { byCmd: 1 }); delete o.reserve;   // byCmd: the corps staff plans river crossings for divisions under its orders
     if (child.forms) S.issueCommandOrder(child, path, line, o); else S.issueOrder(child, path, line, o);
   }
+  // a real pocket: an enemy-held objective standing on our ground with our ground all round it (eight points on a ring; sea and the map edge count as closed).
+  // Standing on our ground alone doubled the score of every bypassed town near our troops and drew corps back from the pursuit.
+  const pocketed = (v, s, ring) => { if (S.ownAt(v.x, v.y) !== s) return false; const m = S.map; for (let k = 0; k < 8; k++) { const x = v.x + Math.cos(k * Math.PI / 4) * ring, y = v.y + Math.sin(k * Math.PI / 4) * ring; if (x < 0 || y < 0 || x >= m.w || y >= m.h || m.t[m.idx(x, y)] === 12) continue; if (S.ownAt(x, y) !== s) return false; } return true; };
   // a division the player gives its own order leaves the corps plan: the corps commander no longer counts it as a sector or as his reserve
   S.leaveCorpsOrder = function (F) { const C = F.parent, O = C && C.order; if (!O || !O.plan) return false; const i = O.plan.findIndex(q => q.child === F); if (i < 0) return false; O.plan.splice(i, 1); if (O.whyChild === F) { O.why = ''; O.whyChild = null; } return true; };
   function report(C, txt, lvl) { C.log.push({ t: S.t, txt }); S.say(C.s, C.n + ': ' + txt, lvl || 1); }
@@ -206,7 +209,7 @@ function attachCommand(S) {
     if (bad && res && !kept) {
       const q = bad.q; if (bad.st === 'stalled') res.relieved = true;
       // the relieved division rests where it stands and becomes the reserve; the fresh division passes through to the sector
-      if (bad.st !== 'lost') { const p = pos(q.child), m = polyAt(q.line, polyLen(q.line) / 2), dx = m.x - p[0], dy = m.y - p[1], dl = Math.hypot(dx, dy) || 1, hw = 1.5;
+      if (bad.st !== 'lost' && pos(q.child)) { const p = pos(q.child), m = polyAt(q.line, polyLen(q.line) / 2), dx = m.x - p[0],   /* a division with no leading battalion left has no position to rest on: it gets no order (this crashed one batch game in twenty from 24 November) */ dy = m.y - p[1], dl = Math.hypot(dx, dy) || 1, hw = 1.5;
         send(q.child, [], [[p[0] - dy / dl * hw, p[1] + dx / dl * hw], [p[0] + dy / dl * hw, p[1] - dx / dl * hw]], O.opt, false, 'rest'); }
       send(res.child, [], q.line, O.opt, false);
       res.reserve = false; res.line = q.line; res.best = 1e9; res.tBest = S.t; res.w0 = weight(res.child);
@@ -244,8 +247,14 @@ function attachCommand(S) {
         if (C.order && C.order.st === 'issued' && !C.order.doneSaid && S.t - C.order.t0 < (cfg.waitH || 48) * 60) continue;   // a corps attack still under way runs to its end, or 48 hours
         const kids = C.forms.filter(F => !F.forms && F.active && !F.dead); if (!kids.length) continue;
         if (kids.reduce((a, F) => a + F.stock / Math.max(1, F.cap), 0) / kids.length < (cfg.supply || lerp(ARMYAI.supply))) continue;
-        const p = pos(C); if (!p) continue; let best = null, bs = -1e9;
-        for (const v of S.vp) { if (v.own === C.s || taken.has(v) || (v.noWay && v.noWay[C.s] > S.t)) continue; const d = Math.hypot(v.x - p[0], v.y - p[1]); if (d > (cfg.reachKm || lerp(ARMYAI.reachKm)) || (S.phaseBlock && S.phaseBlock(kids[0], v.x, v.y))) continue; const sc0 = v.pts / (d + 6) * (cfg.pocketBonus && S.ownAt(v.x, v.y) === C.s ? cfg.pocketBonus : 1); if (sc0 > bs) { bs = sc0; best = v; } }   // pocketBonus: an enemy-held objective standing on our ground is a bypassed pocket to reduce
+        let p = pos(C); if (!p) continue; let best = null, bs = -1e9;
+        // a mission axis (cfg.axis: { dir: [x, y], corps: { key: [x, y] }, gain, behind }): the army's direction of advance, by corps where they differ.
+        // The corps is placed by the forward half of its divisions along the axis; an objective ahead scores up to 1 + gain, one behind scores 'behind', a real pocket keeps its bonus.
+        const AX = cfg.axis, ad0 = AX && ((AX.corps && AX.corps[C.key]) || AX.dir), al = ad0 ? Math.hypot(ad0[0], ad0[1]) || 1 : 1, ad = ad0 && [ad0[0] / al, ad0[1] / al];
+        if (ad && kids.length > 1) { const pr = kids.map(F => [F.cx * ad[0] + F.cy * ad[1], F]).sort((a, b) => b[0] - a[0]).slice(0, Math.ceil(kids.length / 2)); p = [pr.reduce((a, q) => a + q[1].cx, 0) / pr.length, pr.reduce((a, q) => a + q[1].cy, 0) / pr.length]; }
+        // a corps the front has left behind finds nothing within reach; it then looks as far as it must, so that it marches after the army where before it sat on its last objective (cfg.far: false keeps the old rule)
+        for (const reach of cfg.far === false ? [cfg.reachKm || lerp(ARMYAI.reachKm)] : [cfg.reachKm || lerp(ARMYAI.reachKm), 1e9]) { if (best) break;
+        for (const v of S.vp) { if (v.own === C.s || taken.has(v) || (v.noWay && v.noWay[C.s] > S.t)) continue; const d = Math.hypot(v.x - p[0], v.y - p[1]); if (d > reach || (S.phaseBlock && S.phaseBlock(kids[0], v.x, v.y))) continue; const pk = cfg.pocketBonus && pocketed(v, C.s, cfg.pocketRingKm || 8), fw = ad ? ((v.x - p[0]) * ad[0] + (v.y - p[1]) * ad[1]) / (d + 1) : 0; const sc0 = v.pts / (d + 6) * (pk ? cfg.pocketBonus : ad ? (fw >= 0 ? 1 + (AX.gain == null ? .5 : AX.gain) * fw : (AX.behind == null ? .25 : AX.behind)) : 1); if (sc0 > bs) { bs = sc0; best = v; } } }   // pocketBonus: an enemy-held objective standing on our ground is a bypassed pocket to reduce
         if (!best) continue;
         // an objective no road or ground leads to (a point in the sea, an island) is set aside for ten days; the corps picks again at the next planning hour
         if (!S.map.findPath(1, p[0], p[1], best.x, best.y, {})) { (best.noWay || (best.noWay = [0, 0]))[C.s] = S.t + 14400; A.nextPlan = Math.min(A.nextPlan, S.t + 60); continue; }

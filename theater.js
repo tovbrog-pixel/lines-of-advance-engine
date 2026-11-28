@@ -10,6 +10,7 @@
 //   7. When enemy troops are loose behind the front, he sends a reserve to block the next town on their road.
 //   8. When the enemy stands deep behind the front, the line is turned. After the delay the high command imposes (okwDelayH),
 //      every holding division is ordered back to the fallback line.
+//   9. An important objective of his own that stands empty with the enemy near gets a division to hold it (coverPts; off unless the scenario sets it).
 // He knows only the enemy units his troops have seen in the last seenH hours.
 // He acts only on the side the computer plays. Every threshold below is a game setting for balance testing.
 const THEATER = {
@@ -27,6 +28,7 @@ const THEATER = {
   reliefNeed: 2,                // an infantry division relieves a mobile one only while the sector is under less pressure than this
   caKm: 25, caLostH: 72, caRestH: 24, caOdds: .8, caStr: .6, caLastH: 36,   // counterattacks: reach, how recently the town fell, rest needed, enemy strength as a share of ours, and how long the attempt lasts
   looseKm: 12, looseBn: 4, looseDeep: 10, blockKm: 80, blockAhead: 40,   // enemy loose behind the front: distance from any of our troops, strength, depth beyond the front, and how far a blocker may come
+  coverPts: 0, coverR: 4, coverBn: 2, coverE: 30, coverFromKm: 40, coverLeave: 6,   // an important objective left empty: its value, the radius and battalions that count as held, how near the enemy must be, how far a division may come (off unless the scenario sets coverPts)
   okwDelayH: 384                // hours between the line being turned and the general withdrawal
 };
 function attachTheater(S) {
@@ -97,6 +99,16 @@ function attachTheater(S) {
           if (pick) { const dx = tv.x - lead.x, dy = tv.y - lead.y, l = Math.hypot(dx, dy) || 1, b = [dx / l, dy / l], key = 'blk:' + tv.n;
             T.sectors[key] = { n: tv.n, p: [tv.x, tv.y], line: [[tv.x - b[1] * 6, tv.y + b[0] * 6], [tv.x + b[1] * 6, tv.y - b[0] * 6]], back: b };
             st.res = st.res.filter(G => G !== pick); hold(pick, key); st.moves++; note('The enemy is loose behind the front near ' + (S.nearTown ? S.nearTown(lead.x, lead.y).replace(/^near /, '') : tv.n) + '. ' + pick.n + ' moves to block at ' + tv.n + '.', 2); } } } }
+    // an important objective with nobody in it: while the enemy is within coverE km, a division goes to hold it. A reserve goes first; failing that the nearest division
+    // whose sector keeps coverLeave battalions of other formations. One objective a tick. (coverPts 0 switches the rule off.)
+    if (cfg.coverPts) for (const v of S.vp) { const key = 'cov:' + v.n; if (v.own !== s || v.pts < cfg.coverPts || count(s, v.x, v.y, cfg.coverR) >= cfg.coverBn) continue;
+      if (S.forms.some(F => F.s === s && !F.dead && F.thSec === key && F.stay)) continue;   // one is on its way
+      let ne = null, nd = cfg.coverE; for (const u of S.subs) { if (u.s !== es || !fights(u) || !(S.t - u.seenT < cfg.seenH * 60)) continue; const d = Math.hypot(u.x - v.x, u.y - v.y); if (d < nd) { nd = d; ne = u; } } if (!ne) continue;
+      let pick = null, pd = cfg.coverFromKm; for (const F of st.res) { if (!F.active) continue; const c = centre(F), d = Math.hypot(c[0] - v.x, c[1] - v.y); if (d < pd) { pd = d; pick = F; } }
+      if (!pick) for (const F of live) { if (!F.thSec || F.fortress || S.strength(F) < cfg.lendStr || S.t - (F.thMoveT || 0) < cfg.lendCoolH * 60 || count(s, T.sectors[F.thSec].p[0], T.sectors[F.thSec].p[1], cfg.nearF, F) < cfg.coverLeave) continue; const c = centre(F), d = Math.hypot(c[0] - v.x, c[1] - v.y); if (d < pd) { pd = d; pick = F; } }
+      if (!pick) continue; const dx = v.x - ne.x, dy = v.y - ne.y, l = Math.hypot(dx, dy) || 1, b = [dx / l, dy / l];
+      T.sectors[key] = { n: v.n, p: [v.x, v.y], line: [[v.x - b[1] * 4, v.y + b[0] * 4], [v.x + b[1] * 4, v.y - b[0] * 4]], back: b };
+      st.res = st.res.filter(G => G !== pick); hold(pick, key); st.moves++; note(v.n + ' stands empty with the enemy ' + Math.round(nd) + ' km away. ' + pick.n + ' moves in to hold it.', 2); break; }
     // enemy behind a division: step back and re-form
     for (const F of live) { if (!F.thSec || !F.thLine || S.t - (F.thMoveT || 0) < cfg.stepCoolH * 60) continue; const c = centre(F), b = F.thBack, L = F.thLine, m = [(L[0][0] + L[1][0]) / 2, (L[0][1] + L[1][1]) / 2];
       if (Math.hypot(c[0] - m[0], c[1] - m[1]) > 12) continue;   // still on the march to its line

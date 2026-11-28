@@ -2,6 +2,19 @@
 
 Tov Binyamin Brog
 
+## 27 November 2026: France 1944's changes since the merge (France commits 01917bd to 32851bd)
+
+- **Arrivals (fault):** a division forming a road or rail column is no longer landed again at its first beach (`arrivals` skips `F.transit`). Every game with arrivals and strategic moves is affected.
+- **Corps review (fault):** no crash when a relieved formation has no position.
+- **Army AI, pocket bonus:** only for an objective with own ground at eight points on a ring round it.
+- **Army AI, mission axis (setting `armyAI.axis`):** an objective ahead on the army's axis scores higher, one behind lower. Off without the setting.
+- **Army AI, reach:** a corps that finds no objective within reach looks as far as it must; before, it kept its last order. On by default; `armyAI.far: false` keeps the old rule. In France a corps sat on a taken objective for up to 355 hours.
+- **Phase lines (settings `nat`, `west`, `east`):** a line can bind listed nationalities only and can close the ground west or east of a north-south line, for a boundary between armies.
+- **Fortresses (formation flag `fortress`, scenario list `forts`):** a fortress garrison does not take the three-kilometre fall-back, and its shaken units fall back on the centre of the works. Inside prepared works a unit of the owning side is dug in to the fort's strength (at most 1.5) within the hour while the objective is held.
+- **Theater commander, rule 9 (setting `coverPts`):** an important objective of his own left empty with the enemy near gets a division. Off without the setting.
+- **Checks:** Sarn Corridor's regression suite matches its baseline with these changes. France 1944: command tests pass; Exercise Cumberland on five seeds, Blue wins all five (60-20, 50-30, 80-0, 50-30, 70-10); a 96-hour Overlord run completes. France's regression fingerprints change on eight scenarios because France had not yet taken the square axis and coherence changes of 25 November; they are re-recorded in France.
+- **Not checked:** Sarn Corridor's own campaign scenario with computer armies, where the reach change applies.
+
 ## 25 November 2026: concentration (scenario setting `concentrate`)
 
 - **Corps and army orders:** with `sc.concentrate`, a line much wider than the attack needs (over 1.5 times) is attacked at its decisive point: the most valuable enemy-held objective within 6 km of the line, else straight ahead of the commander. Two children go in abreast (three when there are five or more), each on about the frontage its battalions need. A corps sends the others after them in second echelon; an army leaves its other corps to hold and screen their present sectors. The order note names who attacks and toward what.

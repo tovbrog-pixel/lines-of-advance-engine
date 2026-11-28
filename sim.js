@@ -64,6 +64,7 @@ function createSim(sc, player, seed, opt) {
     S.air[s] = { bases: sd.bases.map(b => Object.assign({ s }, b)), groups: sd.groups.map(g => ({ n: g[0], key: g[1], ac: AC[g[1]], total: g[2], avail: g[2], base: g[3], mission: g[4], pend: [], next: 0, s })), int: [], strat: [], cas: [], rec: [], ri: 0, si: 0, rci: 0 };
   });
   S.vp = sc.vp.map(v => ({ n: v[0], x: v[1], y: v[2], pts: v[3], own: v[4], orig: v[4], capR: sc.capBig && v[3] >= sc.capBig.pts ? sc.capBig.r : 0 }));   // capBig { pts, r }: an objective worth pts or more is a large town; it changes hands only when none of the holder's troops stand within r km
+  S.fortz = sc.forts ? sc.forts.map(q => Object.assign({}, q, { ent: Math.min(1.5, q.ent || 1.3), v: q.vp ? S.vp.find(v => v.n === q.vp) : null })) : null;   // prepared works, see the dig-in rule
   // crossing equipment: assault boats and floating-bridge sets, parked at a depot until trucked to a crossing site
   S.assets = [[], []]; S.xings = [];
   { let d = 0; for (let c = 0; c < map.N; c++) if (map.t[c] === T.DESERT) d++; S.desert = d > map.N * .3; }   // desert maps double the water and ration draw
@@ -79,7 +80,7 @@ function createSim(sc, player, seed, opt) {
     let i = 0; for (const u of F.subs) { if (u.mv === 'ship') continue; const a = i * 2.4, rr = r * (.3 + .7 * ((i * .37) % 1)); const p = map.snap(u.mvi, x + Math.cos(a) * rr, y + Math.sin(a) * rr, 6) || [x, y]; u.x = p[0]; u.y = p[1]; i++; }
   }
   sc.forms.forEach((fs, fi) => {
-    const F = { id: fi, s: fs.s, nat: fs.nat, n: fs.n, cmd: { n: fs.cmd, ag: clamp(fs.ag + (rnd() - .5) * (.08 + .08 * VR), .2, .98), sk: clamp(fs.sk + (rnd() - .5) * (.08 + .08 * VR), .3, .98), why: fs.why || '' }, xp: (fs.xp || 1) * dfS(fs.s).xp, subs: [], hq: null, order: null, stock: 0, cap: 0, active: false, dead: false, arr: fs.arr || null, ai: fs.ai ? fs.ai.map(a => ({ t: sc.aiExact ? a.t + rnd() * 3 : a.t > 2 ? a.t * (.92 + rnd() * .22) * plan[fs.s].tm * dfS(fs.s).arr : a.t, path: a.path, line: a.line, then: a.then, cond: a.cond })) : null, aiI: 0, res: !!fs.res, hold: !!fs.hold, stay: !!fs.stay, stayUntil: fs.stayUntil || 0, stayMinStr: fs.stayMinStr || 0, rearPt: fs.rear || null, freeT: (fs.free != null ? fs.free : (sc.sides[fs.s].free || 0)) * 60, x: fs.x, y: fs.y, cx: fs.x, cy: fs.y, halt: false, assaultT: 0, evalT: 0, msgT: 0, casCd: 0, airMsgT: 0, convT: 0, convoy: null, isolated: false, isoMsgT: 0, paraT: 0, status: '', nextT: fi * .37, bridge: null, needEng: false, dis: 0, jamT: 0, jamMsgT: 0, haltT: 0, rerouteT: 0, fired: 0, fallT: 0, idleT: 0, led: {}, ledN: {}, att: null };
+    const F = { id: fi, s: fs.s, nat: fs.nat, n: fs.n, cmd: { n: fs.cmd, ag: clamp(fs.ag + (rnd() - .5) * (.08 + .08 * VR), .2, .98), sk: clamp(fs.sk + (rnd() - .5) * (.08 + .08 * VR), .3, .98), why: fs.why || '' }, xp: (fs.xp || 1) * dfS(fs.s).xp, subs: [], hq: null, order: null, stock: 0, cap: 0, active: false, dead: false, arr: fs.arr || null, ai: fs.ai ? fs.ai.map(a => ({ t: sc.aiExact ? a.t + rnd() * 3 : a.t > 2 ? a.t * (.92 + rnd() * .22) * plan[fs.s].tm * dfS(fs.s).arr : a.t, path: a.path, line: a.line, then: a.then, cond: a.cond })) : null, aiI: 0, res: !!fs.res, hold: !!fs.hold, fortress: !!fs.fortress, stay: !!fs.stay, stayUntil: fs.stayUntil || 0, stayMinStr: fs.stayMinStr || 0, rearPt: fs.rear || null, freeT: (fs.free != null ? fs.free : (sc.sides[fs.s].free || 0)) * 60, x: fs.x, y: fs.y, cx: fs.x, cy: fs.y, halt: false, assaultT: 0, evalT: 0, msgT: 0, casCd: 0, airMsgT: 0, convT: 0, convoy: null, isolated: false, isoMsgT: 0, paraT: 0, status: '', nextT: fi * .37, bridge: null, needEng: false, dis: 0, jamT: 0, jamMsgT: 0, haltT: 0, rerouteT: 0, fired: 0, fallT: 0, idleT: 0, led: {}, ledN: {}, att: null };
     for (const sp of fs.sub) { const a = sp.split('|'); F.subs.push(mkSub(F, a[0], a[1], a[2] ? +a[2] : 1, fs.x, fs.y, a[3] ? +a[3] : 1)); }
     // regiments, brigades and combat commands: groups of the division's battalions (France 1944 scenarios only)
     if (fs.regs) { F.regs = fs.regs.map(r => ({ n: r.n, role: r.role || 'man', subs: r.idx.map(i => F.subs[i]).filter(Boolean) })); for (const R of F.regs) for (const u of R.subs) u.reg = R; }
@@ -486,7 +487,7 @@ function createSim(sc, player, seed, opt) {
         F.status = contact ? 'Defending ' + nearTown(F.cx, F.cy) : 'Holding ' + nearTown(F.cx, F.cy);
         if (arrived(F, O, L, en, contact)) return;
         if (under > 1 && en.length) { let top = en[0]; for (const e of en) if (pow(e) > pow(top)) top = e; reqCAS(F, top); }
-        if (contact && S.t > F.fallT && F.cmd.ag < .8 && L.length) {
+        if (contact && S.t > F.fallT && F.cmd.ag < .8 && L.length && !F.fortress) {   // a fortress garrison (scenario flag) stands where it is
           let ep = 0, own = 0; for (const e of en) ep += pow(e); for (const u of L) own += defPow(u);
           if ((S.cohesion(F) < .34 && ep > own * 1.6) || (S.strength(F) < .32 && ep > own)) { const r = rearDir(F, O); O.line = O.line.map(p => [p[0] + r[0] * 3, p[1] + r[1] * 3]); O.slots = null; F.fallT = S.t + 180; say(F, 'Cannot hold ' + nearTown(F.cx, F.cy) + '. Falling back three kilometres.', 2); }
         }
@@ -496,6 +497,8 @@ function createSim(sc, player, seed, opt) {
   }
   function startRetreat(u, far) {
     if (u.mv === 'ship' || u.state === 'retreat') return; const F = u.f; let dx, dy;
+    // a fortress garrison has no rear: a shaken unit goes back to the middle of the fortress, and one already there stands
+    if (F.fortress && F.order && F.order.line) { const L = F.order.line; let mx = (L[0][0] + L[L.length - 1][0]) / 2, my = (L[0][1] + L[L.length - 1][1]) / 2; if (S.fortz) for (const q of S.fortz) if (q.s === u.s && Math.hypot(u.x - q.x, u.y - q.y) <= q.r * 1.5) { mx = q.x; my = q.y; break; }   /* inside prepared works the middle is the works' centre: a unit on an outer line falls back on the port */ if (Math.hypot(mx - u.x, my - u.y) < 1.5) return; const q = map.snap(u.mvi, mx, my, 3); if (!q) return; u.state = 'retreat'; u.goal = q; u.needPath = true; u.assault = false; u.path = null; return; }
     if (u.ne) { dx = u.x - u.ne.x; dy = u.y - u.ne.y; } else { dx = sc.sides[u.s].rear[0]; dy = sc.sides[u.s].rear[1]; }
     if (F.hq && F.hq !== u && !F.hq.dead) { dx += (F.hq.x - u.x) * .5; dy += (F.hq.y - u.y) * .5; }
     if (!u.det) { const rx = F.hq && F.hq !== u && !F.hq.dead && F.hq.active ? F.hq.x : F.cx, ry = F.hq && F.hq !== u && !F.hq.dead && F.hq.active ? F.hq.y : F.cy, rd = Math.hypot(rx - u.x, ry - u.y); if (rd > 5) { dx = (rx - u.x) / rd; dy = (ry - u.y) / rd; } }
@@ -595,7 +598,10 @@ function createSim(sc, player, seed, opt) {
       if (u.dS > 0) { const before = u.str, ap = Math.min(before, u.dS) * u.size; u.str = Math.max(0, u.str - u.dS); u.coh = Math.max(0, u.coh - u.dC); S.losses[u.s] += ap; if (u.dsc) { const lb = u.lb || (u.lb = {}), L = S.lossBy[u.s]; for (const c in u.dsc) { const v = ap * u.dsc[c] / u.dS; lb[c] = (lb[c] || 0) + v; L[c] = (L[c] || 0) + v; } u.dsc = null; } u.dS = 0; u.dC = 0; }
       // cohesion comes back once the shooting stops: more slowly for a battalion cut off or shaken
       const quiet = now - u.hitT > 8, po = u.det ? 'dig' : u.f.post, rest = po === 'rest' && now - u.hitT > 30; u.coh = Math.min((.4 + .6 * u.mor) * (1 - .25 * (u.fat || 0)), u.coh + (quiet ? .004 * (u.oc ? .5 : 1) * (.7 + .6 * u.f.cmd.sk) * (u.ammo > .1 ? 1 : .5) * (rest ? 2 : 1) * (u.cut || u.f.isolated ? .4 : 1) * (u.mor < .3 ? .5 : 1) : .0006));
-      if (!u.moving) { const cap = po === 'hold' ? .7 : po === 'rest' ? .3 : po === 'reserve' ? .2 : po === 'delay' ? .5 : po === 'exploit' ? .4 : 1; if (u.ent < cap) u.ent = Math.min(cap, u.ent + (po === 'dig' ? (u.f.hasEng ? 3 : 2) : 1) / 360); } if (quiet && now - u.hitT > 120 && !u.f.isolated) { if (rest && u.str < .92) u.str += .0003; else if (u.str < .85) u.str += .00006; }
+      if (!u.moving) { let cap = po === 'hold' ? .7 : po === 'rest' ? .3 : po === 'reserve' ? .2 : po === 'delay' ? .5 : po === 'exploit' ? .4 : 1, rate = (po === 'dig' ? (u.f.hasEng ? 3 : 2) : 1) / 360;
+        // prepared works (scenario forts: side, centre, radius, ent, and the objective that must still be held): a unit of that side standing inside them is in cover built beforehand, deeper than field digging and ready within the hour
+        if (S.fortz) for (const q of S.fortz) if (q.s === u.s && Math.hypot(u.x - q.x, u.y - q.y) <= q.r && (!q.v || q.v.own === q.s)) { cap = Math.max(cap, q.ent); rate = Math.max(rate, q.ent / 60); }
+        if (u.ent < cap) u.ent = Math.min(cap, u.ent + rate); } if (quiet && now - u.hitT > 120 && !u.f.isolated) { if (rest && u.str < .92) u.str += .0003; else if (u.str < .85) u.str += .00006; }
       // surrender is a state that has to last: shattered, cut off, out of ammunition, heavily outnumbered close by and with no friends near, for two hours
       if ((u.coh < .08 || u.mor < .14) && u.f.isolated && u.ned < 1) { if (u.surT == null) u.surT = now; } else u.surT = null;
       let sur = false; if (u.surT != null && now - u.surT >= 120 && u.ammo < .1) { const own = powNear(u.s, u.x, u.y, 2), en = powNear(1 - u.s, u.x, u.y, 2); if (en >= 3 * Math.max(own, .05) && !S.subs.some(w => w.s === u.s && w.active && !w.dead && !w.f.isolated && w.cls !== 'hq' && w.mv !== 'ship' && Math.hypot(w.x - u.x, w.y - u.y) < 5)) sur = true; }
@@ -902,7 +908,7 @@ function createSim(sc, player, seed, opt) {
   }
   S.score = () => { const r = [0, 0]; for (const v of S.vp) r[v.own] += v.pts; return r; };
   function arrivals() {
-    for (const F of S.forms) if (F.arr && !F.active && !F.dead) {
+    for (const F of S.forms) if (F.arr && !F.active && !F.dead && !F.transit) {   // a division in a road or rail column is off the map too, and has already arrived once: without this test it was landed again at its first beach or entry point the moment the column formed
       if (!F.trans && F.arr.mode === 'air') {
         if (S.t >= F.arrT - 20) { const why = F.hold ? 'held' : ['fog', 'rain', 'snow', 'dust'].indexOf(S.wx) >= 0 ? WXNAME[S.wx].toLowerCase() : (!F.arr.night && S.night ? 'darkness' : ''); if (why) { F.arrT = S.t + 80; if (!F.hold && S.t > (F.postT || 0)) { F.postT = S.t + 360; say(F, 'Lift postponed: ' + why + ' over the drop zone.', 1, F.x, F.y); } F.status = F.hold ? 'Lift held on your order' : 'Lift postponed: ' + why; continue; } }
         F.status = (F.hold ? 'Lift held. ' : '') + 'Drops ' + S.clock(F.arrT);
@@ -943,7 +949,9 @@ function createSim(sc, player, seed, opt) {
   // phase lines a scenario sets for the AI: until the hour given, staff-run formations of that side take no objective beyond the line
   // (y greater than the line at that x). The France campaign uses them to hold the AI army groups to the lodgment battle.
   S.phaseBlock = function (F, x, y) { const P = sc.phaseLines; if (!P || (F.s === player && !F.staff)) return false;
-    for (const q of P) { if (q.s !== F.s || S.t >= q.until * 60) continue; const L = q.line; let ly = L[L.length - 1][1]; if (x <= L[0][0]) ly = L[0][1]; else for (let i = 1; i < L.length; i++) if (x <= L[i][0]) { ly = L[i - 1][1] + (L[i][1] - L[i - 1][1]) * (x - L[i - 1][0]) / (L[i][0] - L[i - 1][0]); break; } if (q.north ? y < ly : y > ly) return true; }
+    for (const q of P) { if (q.s !== F.s || S.t >= q.until * 60 || (q.nat && q.nat.indexOf(F.nat) < 0)) continue; const L = q.line;
+      // a boundary between armies: the line runs north to south (points in order of y) and closes the ground west or east of it to the listed nationalities
+      if (q.west || q.east) { let lx = L[L.length - 1][0]; if (y <= L[0][1]) lx = L[0][0]; else for (let i = 1; i < L.length; i++) if (y <= L[i][1]) { lx = L[i - 1][0] + (L[i][0] - L[i - 1][0]) * (y - L[i - 1][1]) / (L[i][1] - L[i - 1][1]); break; } if (q.west ? x < lx : x > lx) return true; continue; } let ly = L[L.length - 1][1]; if (x <= L[0][0]) ly = L[0][1]; else for (let i = 1; i < L.length; i++) if (x <= L[i][0]) { ly = L[i - 1][1] + (L[i][1] - L[i - 1][1]) * (x - L[i - 1][0]) / (L[i][0] - L[i - 1][0]); break; } if (q.north ? y < ly : y > ly) return true; }
     return false; };
   // supply priority: S.supPri[side] maps a command node's id to 1 (high) or -1 (low); a division takes the setting of its nearest commanding node that has one
   S.supPri = [{}, {}]; S.supPrio = F => { for (let n = F.parent; n; n = n.parent) { const v = S.supPri[F.s][n.id]; if (v) return v; } return 0; };
